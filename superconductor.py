@@ -41,6 +41,16 @@ class Superconductor():
         self.B_x = B_x
         self.B_y = B_y
     def get_velocity_0(self, k_x, k_y):
+        r"""
+        Zero-order velocity.
+        .. math::
+            
+            \hat{v}_{k_\alpha}^{(0)}= - i w_0 \left(e^{i \left(k_\alpha \tau^z \right)a} -
+            e^{-i \left(k_\alpha \tau^z\right) a} \right)\tau^z\sigma^0+
+            \left(e^{i \left(k_\alpha \tau^z  \right)a} +
+            e^{-i \left(k_\alpha \tau^z \right) a} \right) \left[\delta_{\alpha,x}\lambda_x \tau^0\sigma^y  -\delta_{\alpha,y}\lambda_y \tau^0\sigma^x \right]
+        
+        """
         v_0_k_x = (
                    2*self.w_0*np.sin(k_x) * np.kron(tau_0, sigma_0)
                    + 2*self.Lambda*np.cos(k_x) * np.kron(tau_0, sigma_y)
