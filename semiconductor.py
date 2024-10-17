@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import scipy
 import cmath
 
-class Superconductor():
+class Semiconductor():
     r"""
     A class for a superconductor with spin-orbit coupling and magnetic
     field in the linear response regime of the driving amplitude.
@@ -43,13 +43,21 @@ class Superconductor():
     def get_velocity_0(self, k_x, k_y):
         r"""
         Zero-order velocity.
+        
         .. math::
             
-            \hat{v}_{k_\alpha}^{(0)}= - i w_0 \left(e^{i \left(k_\alpha \tau^z \right)a} -
+            \hat{v}_{k_\alpha}^{(0)}&=& - i w_0 \left(e^{i \left(k_\alpha
+                                                                 \tau^z
+                                                                 \right)a} -
             e^{-i \left(k_\alpha \tau^z\right) a} \right)\tau^z\sigma^0+
             \left(e^{i \left(k_\alpha \tau^z  \right)a} +
-            e^{-i \left(k_\alpha \tau^z \right) a} \right) \left[\delta_{\alpha,x}\lambda_x \tau^0\sigma^y  -\delta_{\alpha,y}\lambda_y \tau^0\sigma^x \right]
-        
+            e^{-i \left(k_\alpha \tau^z \right) a} \right)
+            \left[\delta_{\alpha,x}\lambda_x \tau^0\sigma^y 
+                  -\delta_{\alpha,y}\lambda_y \tau^0\sigma^x \right] \\
+            = 2 w_0 \sin(k_\alpha) \tau^0 \sigma^0 + 2 \cos(k_\alpha)
+            \left[\delta_{\alpha,x}\lambda_x \tau^0\sigma^y 
+                  -\delta_{\alpha,y}\lambda_y \tau^0\sigma^x \right]
+            
         """
         v_0_k_x = (
                    2*self.w_0*np.sin(k_x) * np.kron(tau_0, sigma_0)
@@ -61,6 +69,14 @@ class Superconductor():
                    )
         return [v_0_k_x, v_0_k_y]
     def get_velocity_1(self, k_x, k_y):
+        
+        r""" First-order velocity
+        .. math::
+            A_{1,\alpha} \cos(\Omega t)\left\{ 2 w_0 \cos(k_\alpha )
+                                              \tau^z\sigma^0-2 \sin (k_\alpha )
+              \left[\delta_{\alpha,x}\lambda_x \tau^z\sigma^y
+                -\delta_{\alpha,y}\lambda_y \tau^z\sigma^x \right]\right\}
+        """
         v_1_k_x = (
                    2*self.w_0*np.cos(k_x) * np.kron(tau_z, sigma_0)
                    - 2*self.Lambda*np.sin(k_x) * np.kron(tau_z, sigma_y)
@@ -104,81 +120,56 @@ class Superconductor():
               + self.Delta * np.kron(tau_x, sigma_0)
               ) * 1/2
         return H
-    def get_self_energy_small_B(self, omega, Gamma, U):
-        r"""
+    def get_self_energy_Born_Approximation(self, omega, k_x, k_y, Delta_0,
+                                           U_0):
+        r""" Self-energy in the first order Born approximation without SOC
+            and with Delta_0 the induced gap.
         .. math::
-            \Sigma(\omega) = i\Gamma\tau_0\sigma_0 + \Sigma^0(\omega) + \Sigma^B(\omega)
             
-            \Sigma^0(\omega) = i U\frac{1}{\sqrt{\omega^2-\Delta^2}}(\omega\tau_0\sigma_0-\Delta\tau_x\sigma_0)
+            \Sigma(\omega)= U_0\left(
+            \Sigma_1 \tau_0 \left(\frac{\sigma_0+\sigma_z}{2}
+                                                  \right) +\Sigma_2 \tau_0
+            \left(\frac{\sigma_0-
+             \sigma_z}{2}\right)
+            \right)
             
-            \Sigma^B(\omega) = i U \frac{1}{(\omega^2-\Delta^2)^{3/2}}(\Delta^2\tau_0(B_x\sigma_x + B_y\sigma_y)-\Delta\omega\tau_x(B_x\sigma_x + B_y\sigma_y))
-            
-            U = U_0^2\nu_0\pi
-        Parameters
-        ----------
-        omega : float
-            Frequency.
-        Gamma : float
-            Damping.
+            \Sigma_1=\\
 
-        Returns
-        -------
-        ndarray
-            4x4 self-energy.
-        """
-        Sigma_Gamma = 1j*Gamma * np.kron(tau_0, sigma_0)
-        Sigma_0 = (1j*U/cmath.sqrt(omega**2 - self.Delta**2)
-                    * (omega*np.kron(tau_0, sigma_0)
-                       - self.Delta*np.kron(tau_x, sigma_0)))
-        Sigma_B = 1j*U/(omega**2 - self.Delta**2)**(3/2) * (
-            self.Delta**2 * (self.B_x * np.kron(tau_0, sigma_x)
-                             + self.B_y * np.kron(tau_0, sigma_y)
-                             - self.Delta*omega *
-                             (self.B_x * np.kron(tau_x, sigma_x)
-                              + self.B_y * np.kron(tau_x, sigma_y)))
-            )
-        return Sigma_Gamma + Sigma_0 + Sigma_B
-    def get_self_energy_small_Delta(self, omega, Gamma, U):
-        r"""
-        .. math::
-            \Sigma(\omega) = i\Gamma\tau_0\sigma_0 + \Sigma^0(\omega) + \Sigma^B(\omega)
-            
-            \Sigma^0(\omega) = i U\frac{1}{\sqrt{\omega^2-\Delta^2}}(\omega\tau_0\sigma_0-\Delta\tau_x\sigma_0)
-            
-            \Sigma^B(\omega) = i U \frac{1}{(\omega^2-\Delta^2)^{3/2}}(\Delta^2\tau_0(B_x\sigma_x + B_y\sigma_y)-\Delta\omega\tau_x(B_x\sigma_x + B_y\sigma_y))
-            
-            U = U_0^2\nu_0\pi
-        Parameters
-        ----------
-        omega : float
-            Frequency.
-        Gamma : float
-            Damping.
+            -i\frac{|B-\omega|}{\sqrt{(B-\omega)^2-\Delta^2}}, & \text{if}
+            |B-\omega|>\Delta_0\\
+            \frac{B-\omega}{\sqrt{\Delta^2-(B-\omega)^2}}, &
+            \text{if} |B-\omega|<\Delta_0
 
-        Returns
-        -------
-        ndarray
-            4x4 self-energy.
+            \Sigma_2=\\
+                
+            -i\frac{|B+\omega|}{\sqrt{(B+\omega)^2-\Delta^2}}, & \text{if}
+            |B+\omega|>\Delta_0\\
+            \frac{B+\omega}{\sqrt{\Delta^2-(B+\omega)^2}}, & \text{if}
+            |B+\omega|<\Delta_0
+            
         """
-        Sigma_Gamma = 1j*Gamma * np.kron(tau_0, sigma_0)
-        Sigma_0 = 1j*U * np.kron(tau_0, sigma_x) 
-        # Sigma_B = 1j*U/(omega**2 - self.Delta**2)**(3/2) * (
-        #     self.Delta**2 * (self.B_x * np.kron(tau_0, sigma_x)
-        #                      + self.B_y * np.kron(tau_0, sigma_y)
-        #                      - self.Delta*omega *
-        #                      (self.B_x * np.kron(tau_x, sigma_x)
-        #                       + self.B_y * np.kron(tau_x, sigma_y)))
-        #     )
-        return Sigma_Gamma + Sigma_0 #+ Sigma_B
-    def get_self_energy_proximity_effect(self, omega, Gamma, Delta_0):
-        if omega>self.Delta:
-            return -1j * Gamma /(np.sqrt(omega**2 - Delta_0**2)) * (-omega * np.kron(tau_0, sigma_0) + Delta_0 * np.kron(tau_x, sigma_0))
-        else:
-            return Gamma/(np.sqrt(Delta_0**2 - omega**2)) * (-omega * np.kron(tau_0, sigma_0) + Delta_0 * np.kron(tau_x, sigma_0))
-    def get_Green_function(self, omega, k_x, k_y, Gamma, Delta_0):
+        def get_Sigma_1(omega):
+            if abs(self.B - omega) > Delta_0:
+                return -1j * abs(self.B - omega) / ((self.B - omega)**2
+                                                    - self.Delta**2)
+            else:
+                return (self.B - omega) / (Delta_0**2 - (self.B - omega)**2)
+        def get_Sigma_2(omega):
+            if abs(self.B + omega) > Delta_0:
+                return -1j * abs(self.B + omega) / ((self.B + omega)**2
+                                                    - Delta_0**2)
+            else:
+                return (self.B + omega) / (Delta_0 - (self.B + omega)**2)
+        Sigma = U_0 * (get_Sigma_1(omega)
+                * np.kron(tau_0, (sigma_0+sigma_z)/2) + 
+                + get_Sigma_2(omega) * np.kron(tau_0, (sigma_0-sigma_z)/2)
+                )
+        return Sigma
+    def get_Green_function(self, omega, k_x, k_y, Delta_0, U_0):
         r"""
         .. math::
-            G_{\mathbf{k}}(\omega) = [\omega\tau_0\sigma_0 - H_{\mathbf{k}} + i\Gamma\tau_0\sigma_0]^{-1}
+            G_{\mathbf{k}}(\omega) = [\omega\tau_0\sigma_0 - H_{\mathbf{k}} +
+                                      \Sigma(\omega)]^{-1}
         Parameters
         ----------
         omega : float
@@ -197,13 +188,13 @@ class Superconductor():
 
         """
         H_k = self.get_Hamiltonian(k_x, k_y)
-        # Sigma = self.get_self_energy_small_Delta(omega, Gamma, U)
-        Sigma = self.get_self_energy_proximity_effect(omega, Gamma, Delta_0)
+        Sigma = self.get_self_energy_Born_Approximation(self, omega, k_x, k_y,
+                                                        Delta_0, U_0)
         return np.linalg.inv(omega*np.kron(tau_0, sigma_0)
                              - H_k
                              + Sigma
                              )
-    def get_spectral_density(self, omega_values, k_x, k_y, Gamma, Delta_0):
+    def get_spectral_density(self, omega_values, k_x, k_y, Gamma, Delta_0, U_0):
         """ Returns the spectral density.
 
         Parameters
@@ -223,13 +214,13 @@ class Superconductor():
             Spectral density.
         """
         if np.size(omega_values)==1:
-            G_k = self.get_Green_function(omega_values, k_x, k_y, Gamma, Delta_0)
-            # return G_k @ (2*Gamma*np.kron(tau_0, sigma_0)) @ G_k.conj().T
+            G_k = self.get_Green_function(self, omega, k_x, k_y, Delta_0, U_0)
             return 1j * (G_k - G_k.conj().T)
         else:
             rho = np.zeros((len(omega_values), 4 , 4), dtype=complex)
             for i, omega in enumerate(omega_values):
-                rho[i, :, :] = self.get_spectral_density(omega, k_x, k_y, Gamma)
+                rho[i, :, :] = self.get_spectral_density(omega, k_x, k_y,
+                                                         Gamma, Delta_0, U_0)
             return rho
     def get_Energy(self, k_x_values, k_y_values):
         if np.size([k_x_values, k_y_values])==2:
@@ -249,41 +240,10 @@ class Superconductor():
         density_of_states_k = np.zeros((len(k_x_values), len(k_y_values)), dtype=complex)
         for i, k_x in enumerate(k_x_values):
             for j, k_y in enumerate(k_y_values):
-                density_of_states_k[i, j] = np.trace(self.get_spectral_density(omega, k_x, k_y, Gamma))
+                density_of_states_k[i, j] = np.trace(
+                    self.get_spectral_density(omega, k_x, k_y, Gamma, Delta_0, U_0))
         density_of_states = 1/(L_x*L_y) * np.sum(density_of_states_k)
         return density_of_states
-    def plot_spectrum(self, k_x_values, k_y_values, index_k_y):
-        E = self.get_Energy(k_x_values, k_y_values)
-        fig, ax = plt.subplots(1, 2)
-        ax1 = ax[0]
-        ax2 = ax[1]
-        ax1.plot(k_x_values, E[:,index_k_y,0])
-        ax1.plot(k_x_values, E[:,index_k_y,1])
-        ax1.plot(k_x_values, E[:,index_k_y,2])
-        ax1.plot(k_x_values, E[:,index_k_y,3])
-        ax1.set_xlabel(r"$k_x$")
-        ax1.set_ylabel(r"$E(k_x,k_y=$"+f"{np.round(k_y_values[index_k_y],2)})")
-        X, Y = np.meshgrid(k_x_values, k_y_values)
-        C1 = ax2.contour(Y, X, E[:,:,1]>0, 0, colors="C1") #notice the inversion of X and Y
-        C2 = ax2.contour(Y, X, E[:,:,2]<0, 0, colors="C2")
-        C3 = ax2.contour(Y, X, E[:,:,0], 10, colors="C0")
-        ax2.clabel(C1, inline=True, fontsize=10)
-        ax2.clabel(C2, inline=True, fontsize=10)
-        ax2.clabel(C3, inline=True, fontsize=10)
-        ax2.set_xlabel(r"$k_x$")
-        ax2.set_ylabel(r"$k_y$")
-        plt.tight_layout()
-        return fig, ax
-    def plot_spectral_density(self, omega_values, k_x, k_y, Gamma):
-        rho = self.get_spectral_density(omega_values, k_x, k_y, Gamma)
-        fig, axs = plt.subplots(4, 4)
-        for i in range(4):
-            for j in range(4):
-                axs[i,j].plot(omega_values, rho[:, i,j], label=r"$(kx, ky)=$"+f"({np.round(k_x,2)}, {np.round(k_y,2)})")
-        fig.supxlabel(r"$\omega$")
-        fig.supylabel(r"$\hat{\rho}_{\mathbf{k}}(\omega)$")
-        fig.suptitle(r"$(kx, ky)=$"+f"({np.round(k_x,2)}, {np.round(k_y,2)})")
-        plt.tight_layout()
     def integrate_spectral_density(self, k_x, k_y, a, b, Gamma):
         f = self.get_spectral_density
         return scipy.integrate.quad_vec(f, a, b, args=(k_x, k_y, Gamma))[0]
@@ -397,7 +357,7 @@ class Superconductor():
             )
         return integrand_ressistive
     def get_integrand_omega_inductive(self, omega, alpha, beta, L_x, L_y, Gamma, Fermi_function, Omega, Delta_0, part="total"):
-     r"""Returns the integrand of the response function element (alpha, beta)
+        r"""Returns the integrand of the response function element (alpha, beta)
      Fermi function should be a function f(omega).
      If part=0, it calculates the paramegnetic part.
      If part=1, it calculates the diamagnetic and paramagnetic
